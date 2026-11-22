@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pari_Smart Home IoT Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script defer src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script defer src="script.js"></script>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <h1>Smart Home Patio by Pari</h1>
+    <p class="sub">Pantau sensor dan kendalikan aktuator ESP32 lewat EMQX Cloud.</p>
+  </div>
+  <div class="status" role="status"><span class="dot" id="dot"></span><span id="stat">Belum terhubung</span></div>
+</header>
+
+<div class="grid">
+  <section class="panel plan" aria-label="Denah rumah">
+    <h2>Kanopi dan Lampu</h2>
+    <svg viewBox="0 0 320 230" role="img" aria-label="Denah: kanopi servo, lampu kuning, lampu merah, sensor gerak">
+      <rect x="10" y="10" width="300" height="210" rx="6" fill="none" stroke="var(--line)" stroke-width="3"/>
+      <line x1="10" y1="170" x2="60" y2="170" stroke="var(--ink)" stroke-width="5"/>
+      <line x1="160" y1="170" x2="310" y2="170" stroke="var(--ink)" stroke-width="5"/>
+      <path d="M160 170 A100 100 0 0 0 60 70" fill="none" stroke="var(--off)" stroke-dasharray="4 5"/>
+      <line id="door" x1="60" y1="170" x2="160" y2="170" stroke="var(--teal)" stroke-width="6" stroke-linecap="round" transform="rotate(0 60 170)"/>
+      <circle cx="60" cy="170" r="5" fill="var(--ink)"/>
+      <text x="170" y="196" fill="var(--mute)" font-size="12">kanopi (servo)</text>
+      <circle id="lampY" cx="60" cy="50" r="16" fill="var(--off)"/><text x="40" y="84" fill="var(--mute)" font-size="12">LED kuning</text>
+      <circle id="lampR" cx="260" cy="50" r="16" fill="var(--off)"/><text x="238" y="84" fill="var(--mute)" font-size="12">LED merah</text>
+      <circle id="pirHalo" class="" cx="160" cy="50" r="10" fill="none" stroke="var(--red)" stroke-width="2" opacity="0"/>
+      <circle id="pir" cx="160" cy="50" r="9" fill="var(--off)"/><text x="138" y="84" fill="var(--mute)" font-size="12">Sensor PIR</text>
+    </svg>
+    <div class="legend"><span>kanopi terbuka mengikuti sudut servo (0–180°).</span></div>
+  </section>
+
+  <section class="panel" aria-label="Data sensor">
+    <h2>Data sensor</h2>
+    <div class="stats">
+      <div class="stat"><span>Suhu</span><div class="num" id="t">–<small> °C</small></div></div>
+      <div class="stat"><span>Kelembapan</span><div class="num" id="h">–<small> %</small></div></div>
+      <div class="stat"><span>Cahaya (LDR)</span><div class="num" id="l">–</div><em id="lt">menunggu data</em></div>
+      <div class="stat"><span>Gerakan (PIR)</span><div class="num" id="p">–</div><em id="pt">menunggu data</em></div>
+    </div>
+    <div class="mode">
+      <div><strong id="modeTxt">Mode: –</strong><br><span class="sub">Otomatis memakai logika PIR dan LDR di ESP32.</span></div>
+      <button id="btnAuto" class="primary">Aktifkan otomatis</button>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Kontrol">
+    <h2>Kontrol manual</h2>
+    <div class="ctrl">
+      <button id="cY" aria-pressed="false">LED kuning</button>
+      <button id="cR" aria-pressed="false">LED merah</button>
+      <button id="cB" aria-pressed="false">Buzzer</button>
+    </div>
+    <div class="row">
+      <label for="sv" class="servo-label">Servo: <b id="svv">0</b>°</label>
+      <input id="sv" type="range" min="0" max="180" value="0">
+    </div>
+    <p class="sub note">Mengubah aktuator dari sini otomatis memindahkan ESP32 ke mode manual.</p>
+  </section>
+
+  <section class="panel" aria-label="Grafik">
+    <h2>Suhu dan kelembapan</h2>
+    <canvas id="cv" aria-label="Grafik suhu dan kelembapan terbaru"></canvas>
+    <div class="key">
+      <span><i class="k-temp"></i>Suhu (°C)</span>
+      <span><i class="k-hum"></i>Kelembapan (%)</span>
+    </div>
+  </section>
+
+  <section class="panel full">
+    <details id="cfgBox" open>
+      <summary>Pengaturan koneksi broker</summary>
+      <div class="cfg">
+        <label>Host<input type="text" id="host" value="vf24f1fb.ala.us-east-1.emqxsl.com"></label>
+        <label>Port WebSocket (TLS)<input type="number" id="port" value="8084"></label>
+        <label>Username<input type="text" id="user" value="parilah" autocomplete="off"></label>
+        <label>Password<input type="password" id="pass" value="ikanpari" autocomplete="off"></label>
+      </div>
+      <div class="row actions">
+        <button class="primary" id="btnConn">Hubungkan</button>
+        <button id="btnDemo">Coba mode demo</button>
+        <button id="btnTheme">Ganti tema</button>
+      </div>
+      <p class="sub">Port 8883 di kode ESP32 itu untuk MQTT biasa. Browser butuh WebSocket, yaitu port 8084 di EMQX Cloud. Pastikan akun di atas ada di menu Authentication EMQX.</p>
+      <div class="log" id="log" aria-live="polite"></div>
+    </details>
+  </section>
+</div>
+</main>
+</body>
+</html>
